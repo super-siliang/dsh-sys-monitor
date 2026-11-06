@@ -4,6 +4,9 @@
 
 DeepSeek Harness 的「系统监控」插件：一个 btop 风格的本机资源面板，在网页里实时查看 CPU、内存、磁盘、网络与进程。
 
+![系统监控预览](https://raw.githubusercontent.com/m430/dsh-sys-monitor/main/preview.jpg)
+
+*界面预览（浅色主题）*
 
 ## 功能
 
@@ -24,7 +27,7 @@ DeepSeek Harness 的「系统监控」插件：一个 btop 风格的本机资源
 在 DeepSeek Harness 的 **Plugin Manager / 插件管理** 中安装 `dsh-sys-monitor`，或指定版本：
 
 ```text
-dsh-sys-monitor@0.3.2
+dsh-sys-monitor@0.3.3
 ```
 
 ### 从源码安装

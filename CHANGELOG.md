@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.3 - 2026-11-06
+
+### Features
+
+- Add a user-column eye toggle to hide usernames.
+- Shift the panel title clear of the sidebar controls when the sidebar is collapsed.
+- Add a README preview image.
+
 ## 0.3.2 - 2026-11-06
 
 ### Documentation

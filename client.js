@@ -84,6 +84,10 @@ window.__ModuleLoader__.load({
       state: '状态',
       timePlus: 'CPU 时间',
       command: '命令',
+      hidePaths: '隐藏路径',
+      showPaths: '显示路径',
+      hideUsers: '隐藏用户名',
+      showUsers: '显示用户名',
       noProcesses: '没有匹配的进程',
       selectedProcess: '进程详情',
       close: '关闭',
@@ -178,6 +182,10 @@ window.__ModuleLoader__.load({
       state: 'State',
       timePlus: 'CPU Time',
       command: 'Command',
+      hidePaths: 'Hide paths',
+      showPaths: 'Show paths',
+      hideUsers: 'Hide users',
+      showUsers: 'Show users',
       noProcesses: 'No matching processes',
       selectedProcess: 'Process details',
       close: 'Close',
@@ -459,6 +467,27 @@ window.__ModuleLoader__.load({
       );
     }
 
+    function EyeIcon({ size = 13, off = false }) {
+      return h(
+        'svg',
+        { width: size, height: size, viewBox: '0 0 14 14', fill: 'none', 'aria-hidden': true },
+        h('path', { d: 'M1.4 7s2.1-4.1 5.6-4.1S12.6 7 12.6 7s-2.1 4.1-5.6 4.1S1.4 7 1.4 7Z', stroke: 'currentColor', strokeWidth: 1.35, strokeLinejoin: 'round' }),
+        h('circle', { cx: 7, cy: 7, r: 1.8, stroke: 'currentColor', strokeWidth: 1.35 }),
+        off ? h('path', { d: 'M2 2l10 10', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' }) : null,
+      );
+    }
+
+    function maskCommand(row) {
+      const name = row.name || '';
+      const command = row.command || '';
+      const tail = command.startsWith(name) ? command.slice(name.length).trim() : command;
+      const length = Math.max(8, Math.min(48, Math.ceil(tail.length / 2)));
+      return `${name}${name ? '  ' : ''}${'•'.repeat(length)}`;
+    }
+    function maskUser(user) {
+      return '•'.repeat(Math.max(4, Math.min(12, String(user || '').length)));
+    }
+
     function processInitial(name) {
       const text = String(name || '?').trim();
       return text ? text.charAt(0).toUpperCase() : '?';
@@ -716,6 +745,7 @@ window.__ModuleLoader__.load({
       const {
         rows, snapshot, t, query, setQuery, filter, setFilter,
         sortKey, sortDir, onSort, selectedPid, setSelectedPid,
+        maskPaths, setMaskPaths, maskUsers, setMaskUsers,
       } = props;
 
       const columns = [
@@ -770,17 +800,39 @@ window.__ModuleLoader__.load({
           h('table', { className: 'dsm-table' },
             h('thead', null,
               h('tr', null,
-                columns.map((column) => h(
-                  'th',
-                  {
-                    key: column.key,
-                    className: classNames(column.className, sortKey === column.key && 'is-sorted'),
-                    onClick: () => onSort(column.key),
-                    scope: 'col',
-                  },
-                  column.label,
-                  sortKey === column.key ? h('i', { className: 'dsm-sortArrow' }, sortDir === 'asc' ? '▲' : '▼') : null,
-                )),
+                columns.map((column) => {
+                  const privacy = column.key === 'name'
+                    ? { masked: maskPaths, setMasked: setMaskPaths, hide: t('hidePaths'), show: t('showPaths') }
+                    : column.key === 'user'
+                      ? { masked: maskUsers, setMasked: setMaskUsers, hide: t('hideUsers'), show: t('showUsers') }
+                      : null;
+                  return h(
+                    'th',
+                    {
+                      key: column.key,
+                      className: classNames(column.className, sortKey === column.key && 'is-sorted'),
+                      onClick: () => onSort(column.key),
+                      scope: 'col',
+                    },
+                    privacy
+                      ? h('span', { className: 'dsm-cmdHead' },
+                        column.label,
+                        h('button', {
+                          type: 'button',
+                          className: classNames('dsm-eyeBtn', privacy.masked && 'is-off'),
+                          title: privacy.masked ? privacy.show : privacy.hide,
+                          'aria-label': privacy.masked ? privacy.show : privacy.hide,
+                          'aria-pressed': privacy.masked,
+                          onClick: (event) => {
+                            event.stopPropagation();
+                            privacy.setMasked(!privacy.masked);
+                          },
+                        }, h(EyeIcon, { size: 13, off: privacy.masked })),
+                      )
+                      : column.label,
+                    sortKey === column.key ? h('i', { className: 'dsm-sortArrow' }, sortDir === 'asc' ? '▲' : '▼') : null,
+                  );
+                }),
               ),
             ),
             h('tbody', null,
@@ -792,10 +844,10 @@ window.__ModuleLoader__.load({
                     key: row.pid,
                     className: classNames('dsm-procRow', selectedPid === row.pid && 'is-selected'),
                     onClick: () => setSelectedPid(row.pid),
-                    title: row.command,
+                    title: maskPaths ? undefined : row.command,
                   },
                   h('td', { className: 'dsm-c-pid' }, String(row.pid)),
-                  h('td', { className: 'dsm-c-user', title: row.user }, row.user),
+                  h('td', { className: 'dsm-c-user', title: maskUsers ? undefined : row.user }, maskUsers ? maskUser(row.user) : row.user),
                   h('td', { className: 'dsm-c-num' }, h('span', { className: classNames('dsm-cpuText', row.cpu >= 50 && 'is-hot', row.cpu >= 10 && row.cpu < 50 && 'is-warm') }, row.cpu.toFixed(1))),
                   h('td', { className: 'dsm-c-num' }, row.mem.toFixed(1)),
                   h('td', { className: 'dsm-c-num dsm-c-rss' }, formatBytes(row.rss)),
@@ -804,7 +856,7 @@ window.__ModuleLoader__.load({
                   h('td', { className: 'dsm-c-cmd' },
                     h('span', { className: 'dsm-cmdWrap' },
                       h(ProcessIcon, { process: row, size: 14 }),
-                      h('span', { className: 'dsm-cmdText' }, row.command || row.name),
+                      h('span', { className: 'dsm-cmdText' }, maskPaths ? maskCommand(row) : row.command || row.name),
                     ),
                   ),
                 )),
@@ -891,14 +943,14 @@ window.__ModuleLoader__.load({
       );
     }
 
-    function ProcessDetail({ process: item, t, onClose, onKilled }) {
+    function ProcessDetail({ process: item, t, onClose, onKilled, maskPaths, maskUsers }) {
       const [dialogOpen, setDialogOpen] = useState(false);
       const [busy, setBusy] = useState(false);
       const [error, setError] = useState(null);
 
       const rows = [
         [t('ppid'), String(item.ppid)],
-        [t('user'), item.user],
+        [t('user'), maskUsers ? maskUser(item.user) : item.user],
         [t('state'), stateLabel(item.state, t)],
         [t('cpuShort'), formatPercent(item.cpu)],
         [t('memShort'), formatPercent(item.mem)],
@@ -977,7 +1029,7 @@ window.__ModuleLoader__.load({
         ),
         h('div', { className: 'dsm-detailCommand' },
           h('span', { className: 'dsm-kicker' }, t('command')),
-          h('code', null, item.command || item.name),
+          h('code', null, maskPaths ? maskCommand(item) : item.command || item.name),
         ),
         dialogOpen
           ? h(KillConfirmDialog, {
@@ -1005,6 +1057,8 @@ window.__ModuleLoader__.load({
       const [sortKey, setSortKey] = useState('cpu');
       const [sortDir, setSortDir] = useState('desc');
       const [selectedPid, setSelectedPid] = useState(null);
+      const [maskPaths, setMaskPaths] = useState(false);
+      const [maskUsers, setMaskUsers] = useState(false);
       const [history, setHistory] = useState({ cpu: [], mem: [], disk: [], net: [] });
       const [notice, setNotice] = useState(null);
 
@@ -1135,8 +1189,12 @@ window.__ModuleLoader__.load({
                 onSort,
                 selectedPid,
                 setSelectedPid,
+                maskPaths,
+                setMaskPaths,
+                maskUsers,
+                setMaskUsers,
               }),
-              selected ? h(ProcessDetail, { process: selected, t, onClose: () => setSelectedPid(null), onKilled: handleKilled }) : null,
+              selected ? h(ProcessDetail, { process: selected, t, onClose: () => setSelectedPid(null), onKilled: handleKilled, maskPaths, maskUsers }) : null,
             ),
           ),
         h('footer', { className: 'dsm-footer' },
@@ -1154,7 +1212,7 @@ window.__ModuleLoader__.load({
     const CSS = `
 .dsm-root{--dsm-mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;display:flex;flex-direction:column;width:100%;height:100%;min-height:0;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);overflow:hidden}
 .dsm-root *{box-sizing:border-box}
-.dsm-topbar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;border-bottom:1px solid var(--dsw-alias-border-l1);background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 62%,transparent)}
+.dsm-topbar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px 14px max(20px, var(--dsh-frame-leading-clearance, 20px));border-bottom:1px solid var(--dsw-alias-border-l1);background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 62%,transparent);transition:padding-left var(--ds-transition-duration-slow, 220ms) var(--ds-ease-in-out, ease)}
 .dsm-brand{display:flex;align-items:center;gap:12px;min-width:0}
 .dsm-brandGlyph{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;flex:none;border:1px solid color-mix(in srgb,var(--dsw-alias-brand-primary) 40%,var(--dsw-alias-border-l1));border-radius:11px;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent);color:var(--dsw-alias-brand-primary)}
 .dsm-brandText{min-width:0}
@@ -1294,6 +1352,11 @@ window.__ModuleLoader__.load({
 .dsm-c-cmd{width:auto}
 .dsm-cmdWrap{display:flex;align-items:center;gap:6px;min-width:0;width:100%}
 .dsm-cmdText{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.dsm-cmdHead{display:inline-flex;align-items:center;gap:5px;min-width:0}
+.dsm-eyeBtn{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;border:1px solid transparent;border-radius:4px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;vertical-align:middle}
+.dsm-eyeBtn:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+.dsm-eyeBtn.is-off{color:var(--dsw-alias-state-warn-primary)}
+.dsm-eyeBtn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
 .dsm-procIcon{flex:none;display:inline-block;object-fit:contain;border-radius:3px}
 .dsm-procIconFallback{display:inline-flex;align-items:center;justify-content:center;border-radius:4px;background:color-mix(in srgb,var(--dsw-alias-brand-primary) 17%,var(--dsw-alias-bg-layer-2));color:var(--dsw-alias-brand-primary);font-weight:700;line-height:1;text-transform:uppercase}
 .dsm-cpuText{font-weight:600}
