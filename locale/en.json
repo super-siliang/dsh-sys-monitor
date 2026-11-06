@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "System Monitor",
+    "description": "A btop-style local monitor for CPU, memory, disks, networks, and processes, with app icons and force-quit."
+  }
+}
