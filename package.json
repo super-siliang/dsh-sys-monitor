@@ -1,6 +1,6 @@
 {
   "name": "dsh-sys-monitor",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "private": false,
   "type": "module",
   "description": "btop 风格的本机系统监控：在 DeepSeek Harness 网页中实时查看 CPU、内存、磁盘、网络与进程，支持应用图标与强制退出进程。",

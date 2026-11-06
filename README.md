@@ -2,7 +2,8 @@
 
 [![npm version](https://img.shields.io/npm/v/dsh-sys-monitor.svg)](https://www.npmjs.com/package/dsh-sys-monitor)
 
-DeepSeek Harness 的「系统监控」插件：一个 btop 风格的本机资源面板，左侧栏点击图标即可在网页中实时查看 CPU、内存、磁盘、网络与进程列表。
+DeepSeek Harness 的「系统监控」插件：一个 btop 风格的本机资源面板，在网页里实时查看 CPU、内存、磁盘、网络与进程。
+
 
 ## 功能
 
@@ -16,14 +17,6 @@ DeepSeek Harness 的「系统监控」插件：一个 btop 风格的本机资源
 - **强制退出**：进程详情内提供电源图标，通过确认弹窗后发送 SIGKILL；Host 会保护自身进程并拒绝来自非授权用户的请求。
 - **实时控制**：0.5s / 1s / 2s / 5s 刷新间隔，可暂停采样。
 
-## 实现
-
-- Host 端使用 Node `os` 模块与系统自带 `ps`、`vm_stat`、`sysctl`、`df`、`ioreg`、`netstat` 采集数据。
-- 数据通过 Harness 的 `ctx.connection.fetch` 鉴权通道暴露为 `GET /api/dsh-sys-monitor/snapshot`、`/icon`、`/kill`，不额外监听端口。
-- 进程图标通过 macOS 自带的 `sips` 将 `.app` 的 `.icns` 转为 PNG，并带本地缓存。
-- Client 端是原生 Harness 面板，使用 `--dsw-alias-*` 主题 token，自动适配明暗主题。
-- 监控读取为只读；仅在用户明确确认流程后才会结束所选的单个进程。
-
 ## 安装
 
 ### 从 npm 安装
@@ -31,7 +24,7 @@ DeepSeek Harness 的「系统监控」插件：一个 btop 风格的本机资源
 在 DeepSeek Harness 的 **Plugin Manager / 插件管理** 中安装 `dsh-sys-monitor`，或指定版本：
 
 ```text
-dsh-sys-monitor@0.3.0
+dsh-sys-monitor@0.3.2
 ```
 
 ### 从源码安装
@@ -41,23 +34,15 @@ git clone https://github.com/m430/dsh-sys-monitor.git
 cd dsh-sys-monitor
 ```
 
-然后在 DeepSeek Harness 的插件管理中选择这个本地目录安装。也可以用 `plugin_manager install_bundle` 指向本地绝对路径。
+然后在 DeepSeek Harness 的插件管理中选择这个本地目录安装。
 
 安装后刷新页面，左侧栏出现「系统监控」图标。
 
-## 目录
+## 使用
 
-```text
-dsh-sys-monitor/
-├── index.js          Host 端：系统采样 + /api 路由
-├── client.js         Client 端：btop 风格面板
-├── cordis.patch.yml  Bundle patch
-├── locale/           插件列表显示文案
-├── icon.svg          插件图标
-├── CHANGELOG.md      更新日志
-├── CHANGELOG.zh.md   中文更新日志
-└── package.json
-```
+- 点击左侧栏「系统监控」进入面板。
+- 点击任意进程行查看详情；详情标题 PID 后的电源图标可强制退出该进程。
+- 右上角可调整刷新间隔或暂停采样。
 
 ## 许可证
 

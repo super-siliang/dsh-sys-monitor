@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2 - 2026-11-06
+
+### Documentation
+
+- Simplify the README to user-facing sections only.
+
 ## 0.3.0 - 2026-11-06
 
 ### Features
