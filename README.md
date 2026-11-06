@@ -6,8 +6,6 @@ DeepSeek Harness 的「系统监控」插件：一个 btop 风格的本机资源
 
 ![系统监控预览](https://raw.githubusercontent.com/m430/dsh-sys-monitor/main/preview.jpg)
 
-*界面预览（浅色主题）*
-
 ## 功能
 
 - **CPU**：总体使用率、每核心占用条、90 点历史曲线、1/5/15 分钟负载。
