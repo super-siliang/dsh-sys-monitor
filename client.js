@@ -56,6 +56,18 @@ window.__ModuleLoader__.load({
       read: '读取',
       write: '写入',
       network: '网络',
+      battery: '电池',
+      batteryStatusCharging: '充电中',
+      batteryStatusDischarging: '使用电池',
+      batteryStatusFull: '已充满',
+      batteryStatusAc: '已接通电源',
+      batteryTimeRemaining: '预计可用',
+      batteryCycles: '循环次数',
+      batteryHealth: '健康度',
+      batteryTemperature: '电池温度',
+      batteryNo: '未检测到电池',
+      fan: '风扇',
+      fanUnavailable: '风扇传感器不可用',
       download: '下载',
       upload: '上传',
       totalTransferred: '本次累计',
@@ -154,6 +166,18 @@ window.__ModuleLoader__.load({
       read: 'Read',
       write: 'Write',
       network: 'Network',
+      battery: 'Battery',
+      batteryStatusCharging: 'Charging',
+      batteryStatusDischarging: 'On battery',
+      batteryStatusFull: 'Fully charged',
+      batteryStatusAc: 'AC power',
+      batteryTimeRemaining: 'Remaining',
+      batteryCycles: 'Cycles',
+      batteryHealth: 'Health',
+      batteryTemperature: 'Battery temp',
+      batteryNo: 'No battery detected',
+      fan: 'Fans',
+      fanUnavailable: 'Fan sensors unavailable',
       download: 'Download',
       upload: 'Upload',
       totalTransferred: 'Session total',
@@ -679,6 +703,84 @@ window.__ModuleLoader__.load({
       );
     }
 
+    function BatteryPanel({ data, t }) {
+      const battery = data && data.battery ? data.battery : null;
+      if (!battery) {
+        return h(
+          'section',
+          { className: 'dsm-panel' },
+          h('div', { className: 'dsm-panelHead' },
+            h('span', { className: 'dsm-kicker' }, t('battery')),
+            h('span', { className: 'dsm-headNote' }, '—'),
+          ),
+          h('div', { className: 'dsm-muted' }, t('batteryNo')),
+        );
+      }
+      const statusKey = {
+        charging: 'batteryStatusCharging',
+        discharging: 'batteryStatusDischarging',
+        full: 'batteryStatusFull',
+        ac: 'batteryStatusAc',
+      }[battery.status] || 'batteryStatusAc';
+      const tone = battery.percent <= 20 ? 'error' : battery.percent <= 40 ? 'warn' : 'ok';
+      const details = [
+        [t('batteryTimeRemaining'), battery.timeRemainingMinutes != null ? formatDuration(battery.timeRemainingMinutes * 60, t) : '—'],
+        [t('batteryCycles'), battery.cycleCount != null ? String(battery.cycleCount) : '—'],
+        [t('batteryHealth'), battery.healthPercent != null ? `${battery.healthPercent}%` : '—'],
+        [t('batteryTemperature'), battery.temperatureC != null ? `${battery.temperatureC}°C` : '—'],
+      ];
+      return h(
+        'section',
+        { className: 'dsm-panel' },
+        h('div', { className: 'dsm-panelHead' },
+          h('div', null,
+            h('span', { className: 'dsm-kicker' }, t('battery')),
+            h('strong', { className: `dsm-bigNum is-${tone}` }, `${battery.percent}%`),
+          ),
+          h('span', { className: 'dsm-headNote' }, `${t(statusKey)}${battery.adapterWatts ? ` · ${battery.adapterWatts}W` : ''}`),
+        ),
+        h('div', { className: 'dsm-batteryTrack' },
+          h('i', { className: `is-${tone}`, style: { width: `${battery.percent}%` } }),
+        ),
+        h('div', { className: 'dsm-infoGrid dsm-batteryGrid' },
+          details.map(([label, value]) => h('div', { className: 'dsm-infoRow', key: label },
+            h('span', null, label),
+            h('b', { title: value }, value),
+          )),
+        ),
+      );
+    }
+
+    function FanPanel({ data, t }) {
+      const fans = data && data.fans && Array.isArray(data.fans.fans) ? data.fans.fans : [];
+      const maxRpm = fans.reduce((max, fan) => Math.max(max, Number(fan.rpm) || 0), 0);
+      return h(
+        'section',
+        { className: 'dsm-panel' },
+        h('div', { className: 'dsm-panelHead' },
+          h('div', null,
+            h('span', { className: 'dsm-kicker' }, t('fan')),
+            h('strong', { className: 'dsm-bigNum' }, fans.length > 0 ? `${Math.round(maxRpm)} RPM` : '—'),
+          ),
+          h('span', { className: 'dsm-headNote' }, fans.length > 0 ? `${fans.length} ${t('fan')}` : t('fanUnavailable')),
+        ),
+        fans.length > 0
+          ? h('div', { className: 'dsm-fanList' },
+            fans.map((fan) => {
+              const rpm = Number(fan.rpm) || 0;
+              const max = Number(fan.max) || 0;
+              const percent = max > 0 ? clamp((rpm / max) * 100, 0, 100) : 0;
+              return h('div', { className: 'dsm-fanRow', key: fan.index },
+                h('span', { className: 'dsm-fanLabel' }, `${t('fan')} ${fan.index + 1}`),
+                h(Meter, { value: percent, tone: percent >= 85 ? 'warn' : 'ok' }),
+                h('span', { className: 'dsm-fanRpm' }, `${Math.round(rpm)} RPM`),
+              );
+            }),
+          )
+          : h('div', { className: 'dsm-muted' }, t('fanUnavailable')),
+      );
+    }
+
     function SystemPanel({ data, t }) {
       const host = data ? data.host : { hostname: '—', platformLabel: '—', osVersion: '—', arch: '—', cpuModel: '—', cpuCount: 0, uptimeSec: 0, load: [0, 0, 0] };
       const summary = data ? data.processSummary : { total: 0, running: 0, sleeping: 0, stopped: 0, zombie: 0, other: 0 };
@@ -813,6 +915,7 @@ window.__ModuleLoader__.load({
                       className: classNames(column.className, sortKey === column.key && 'is-sorted'),
                       onClick: () => onSort(column.key),
                       scope: 'col',
+                      'aria-sort': sortKey === column.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none',
                     },
                     privacy
                       ? h('span', { className: 'dsm-cmdHead' },
@@ -830,7 +933,9 @@ window.__ModuleLoader__.load({
                         }, h(EyeIcon, { size: 13, off: privacy.masked })),
                       )
                       : column.label,
-                    sortKey === column.key ? h('i', { className: 'dsm-sortArrow' }, sortDir === 'asc' ? '▲' : '▼') : null,
+                    sortKey === column.key
+                      ? h('i', { className: 'dsm-sortArrow' }, sortDir === 'asc' ? '▲' : '▼')
+                      : h('i', { className: 'dsm-sortHint', 'aria-hidden': true }, '↕'),
                   );
                 }),
               ),
@@ -1050,7 +1155,7 @@ window.__ModuleLoader__.load({
 
     function SystemMonitorPage(props) {
       const t = typeof props.t === 'function' ? props.t : (key) => key;
-      const [refreshMs, setRefreshMs] = useState(1500);
+      const [refreshMs, setRefreshMs] = useState(5000);
       const [paused, setPaused] = useState(false);
       const [query, setQuery] = useState('');
       const [filter, setFilter] = useState('all');
@@ -1173,6 +1278,8 @@ window.__ModuleLoader__.load({
               h(MemoryPanel, { data: snapshot, history: history.mem, t }),
               h(DiskPanel, { data: snapshot, history: history.disk, t }),
               h(NetworkPanel, { data: snapshot, history: history.net, t }),
+              h(BatteryPanel, { data: snapshot, t }),
+              h(FanPanel, { data: snapshot, t }),
               h(SystemPanel, { data: snapshot, t }),
             ),
             h('main', { className: 'dsm-main' },
@@ -1307,6 +1414,16 @@ window.__ModuleLoader__.load({
 .dsm-ifaceList{margin-top:7px;padding-top:7px;border-top:1px solid var(--dsw-alias-border-l1);display:flex;flex-direction:column;gap:3px}
 .dsm-ifaceRow{display:flex;justify-content:space-between;gap:8px;color:var(--dsw-alias-label-secondary);font-family:var(--dsm-mono);font-size:9px;line-height:14px}
 .dsm-ifaceRow span:last-child{color:var(--dsw-alias-label-primary);white-space:nowrap}
+.dsm-batteryTrack{display:flex;height:10px;margin-top:2px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-label-primary) 9%,transparent);overflow:hidden}
+.dsm-batteryTrack>i{display:block;height:100%;border-radius:inherit;background:var(--dsw-alias-state-success-primary);transition:width .35s ease}
+.dsm-batteryTrack>i.is-warn{background:var(--dsw-alias-state-warn-primary)}
+.dsm-batteryTrack>i.is-error{background:var(--dsw-alias-state-error-primary)}
+.dsm-batteryGrid{margin-top:9px}
+.dsm-fanList{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.dsm-fanRow{display:grid;grid-template-columns:52px minmax(0,1fr) 74px;align-items:center;gap:8px;min-width:0}
+.dsm-fanLabel{color:var(--dsw-alias-label-secondary);font-size:9px;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dsm-fanRpm{color:var(--dsw-alias-label-primary);font-family:var(--dsm-mono);font-size:9px;line-height:14px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dsm-fanRow .dsm-meter{height:8px}
 .dsm-sparkWrap.is-disk{color:var(--dsw-alias-brand-primary)}
 .dsm-sparkWrap.is-net{color:var(--dsw-alias-state-success-primary)}
 .dsm-procSummary{display:flex;flex-wrap:wrap;gap:5px 12px;margin-top:10px;padding-top:9px;border-top:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);font-size:10px;line-height:15px}
@@ -1338,6 +1455,8 @@ window.__ModuleLoader__.load({
 .dsm-table thead th:hover{color:var(--dsw-alias-label-primary)}
 .dsm-table thead th.is-sorted{color:var(--dsw-alias-brand-primary)}
 .dsm-sortArrow{margin-left:4px;font-size:7px;font-style:normal;opacity:.85}
+.dsm-sortHint{display:inline-block;margin-left:4px;color:var(--dsw-alias-label-secondary);font-size:8px;font-style:normal;line-height:1;opacity:.32;transition:opacity .15s}
+.dsm-table thead th:hover .dsm-sortHint{opacity:.7}
 .dsm-table tbody td{height:27px;padding:0 8px;border-bottom:1px solid color-mix(in srgb,var(--dsw-alias-border-l1) 55%,transparent);color:var(--dsw-alias-label-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
 .dsm-procRow{cursor:pointer}
 .dsm-procRow:hover td{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 7%,transparent)}

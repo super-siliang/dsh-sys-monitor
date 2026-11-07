@@ -8,9 +8,10 @@
  */
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFile, readdir, rm, stat } from 'node:fs/promises';
+import { chmod, readFile, readdir, rm, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const name = 'dsh-sys-monitor';
 
@@ -24,6 +25,7 @@ const MAX_PROCESSES = 1000;
 const MAX_COMMAND_CHARS = 600;
 const CACHE_MAX_AGE_MS = 250;
 const ICON_SIZE = 64;
+const FAN_HELPER = fileURLToPath(new URL('./bin/smc-fan', import.meta.url));
 
 /** App bundles we are willing to read an icon from. */
 const APP_ROOTS = [
@@ -286,6 +288,60 @@ function parseNetwork(text, state) {
   };
 }
 
+/** Parse AppleSmartBattery fields used by the battery card. */
+function parseBattery(text) {
+  if (!text || !text.includes('AppleSmartBattery')) return null;
+  const readNumber = (key) => {
+    const match = new RegExp(`"${key}"\\s*=\\s*(-?\\d+)`).exec(text);
+    return match ? Number(match[1]) : null;
+  };
+  const readBool = (key) => {
+    const match = new RegExp(`"${key}"\\s*=\\s*(Yes|No)`).exec(text);
+    return match ? match[1] === 'Yes' : null;
+  };
+  const percent = readNumber('CurrentCapacity');
+  if (percent === null) return null;
+  const external = readBool('ExternalConnected');
+  const charging = readBool('IsCharging');
+  const fullyCharged = readBool('FullyCharged');
+  const time = readNumber('TimeRemaining');
+  const cycles = readNumber('CycleCount');
+  const temperature = readNumber('Temperature');
+  const nominal = readNumber('NominalChargeCapacity');
+  const design = readNumber('DesignCapacity');
+  const adapterMatch = /AppleRawAdapterDetails[\s\S]*?"Watts"\s*=\s*(\d+)/.exec(text);
+  const status = external === false
+    ? 'discharging'
+    : charging === true
+      ? 'charging'
+      : fullyCharged === true
+        ? 'full'
+        : 'ac';
+  return {
+    present: true,
+    percent: Math.max(0, Math.min(100, percent)),
+    status,
+    timeRemainingMinutes: status === 'discharging' && time !== null && time > 0 && time < 65535 ? time : null,
+    cycleCount: cycles,
+    healthPercent: nominal !== null && design !== null && design > 0 ? Math.round((nominal / design) * 1000) / 10 : null,
+    temperatureC: temperature !== null && temperature > 0 ? Math.round(temperature / 100 * 10) / 10 : null,
+    adapterWatts: adapterMatch ? Number(adapterMatch[1]) : null,
+  };
+}
+
+/** Read fan speeds through the bundled read-only AppleSMC helper. */
+async function collectFans() {
+  if (os.platform() !== 'darwin') return null;
+  try {
+    await chmod(FAN_HELPER, 0o755);
+    const output = await runFile(FAN_HELPER, []);
+    const parsed = JSON.parse(output);
+    return Array.isArray(parsed.fans) ? { fans: parsed.fans } : null;
+  } catch {
+    return null;
+  }
+}
+
 function processName(commandLine) {
   if (!commandLine) return '';
   const first = commandLine.trim().split(/\s+/)[0] || '';
@@ -428,7 +484,7 @@ function summarizeProcesses(processes) {
 export async function collectSnapshot(state) {
   const platform = os.platform();
   const cpu = sampleCpu(state);
-  const [psText, vmText, swapText, disks, osVersionText, diskText, networkText] = await Promise.all([
+  const [psText, vmText, swapText, disks, osVersionText, diskText, networkText, batteryText, fans] = await Promise.all([
     execText('ps', ['-axo', 'pid=,ppid=,user=,%cpu=,%mem=,rss=,vsz=,stat=,etime=,time=,args=', '-ww']),
     execText('vm_stat', []),
     execText('sysctl', ['-n', 'vm.swapusage']),
@@ -438,6 +494,8 @@ export async function collectSnapshot(state) {
       ? execText('ioreg', ['-r', '-c', 'IOBlockStorageDriver', '-k', 'Statistics'])
       : Promise.resolve(''),
     execText('netstat', ['-ibn']),
+    platform === 'darwin' ? execText('ioreg', ['-r', '-c', 'AppleSmartBattery', '-w0']) : Promise.resolve(''),
+    platform === 'darwin' ? collectFans() : Promise.resolve(null),
   ]);
 
   const allProcesses = parseProcesses(psText);
@@ -463,6 +521,8 @@ export async function collectSnapshot(state) {
     disks,
     diskIO: parseDiskIO(diskText, state),
     network: parseNetwork(networkText, state),
+    battery: parseBattery(batteryText),
+    fans,
     processSummary: summarizeProcesses(allProcesses),
     processes: allProcesses.slice(0, MAX_PROCESSES),
   };

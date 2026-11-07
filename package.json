@@ -22,7 +22,9 @@
     "LICENSE",
     "CHANGELOG.md",
     "CHANGELOG.zh.md",
-    "preview.jpg"
+    "preview.jpg",
+    "bin/smc-fan",
+    "tools/smc-fan.c"
   ],
   "dsh": {
     "bundle": {
@@ -52,13 +54,13 @@
   ],
   "author": "Andy Zheng",
   "license": "MIT",
-  "homepage": "https://github.com/m430/dsh-sys-monitor#readme",
+  "homepage": "https://github.com/super-siliang/dsh-sys-monitor#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/m430/dsh-sys-monitor.git"
+    "url": "git+https://github.com/super-siliang/dsh-sys-monitor.git"
   },
   "bugs": {
-    "url": "https://github.com/m430/dsh-sys-monitor/issues"
+    "url": "https://github.com/super-siliang/dsh-sys-monitor/issues"
   },
   "engines": {
     "node": ">=20.11",
